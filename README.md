@@ -49,7 +49,7 @@ The `/reports/orders-summary` endpoint is implemented using a **single raw SQL q
 1. Clone the repository and navigate to the project directory.
 2. Create a `.env` file from the template:
    ```env
-   DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/ordersync
+   DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/dbname
    ```
 3. Install dependencies:
    ```bash
