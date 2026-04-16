@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, and_
 from sqlalchemy.exc import IntegrityError
@@ -9,7 +9,7 @@ from ..schemas import TransactionCreate, TransactionOut
 router = APIRouter(prefix="/transactions", tags=["Transactions"])
 
 @router.post("/", response_model=TransactionOut)
-async def create_transaction(transaction: TransactionCreate, db: AsyncSession = Depends(get_db)):
+async def create_transaction(transaction: TransactionCreate, response: Response, db: AsyncSession = Depends(get_db)):
     # Rule 2 — Idempotent Transactions
     # Check if key already exists
     existing_stmt = select(Transaction).where(Transaction.idempotency_key == transaction.idempotency_key)
@@ -18,6 +18,7 @@ async def create_transaction(transaction: TransactionCreate, db: AsyncSession = 
     
     if existing_tx:
         # Return 200 OK with original transaction
+        response.status_code = status.HTTP_200_OK
         return existing_tx
 
     # Rule 4 — Order Guards
@@ -49,7 +50,7 @@ async def create_transaction(transaction: TransactionCreate, db: AsyncSession = 
             new_paid_amount = order_obj.paid_amount + transaction.amount
             new_status = order_obj.status
             
-            if new_paid_amount >= order_obj.total_amount:
+            if new_paid_amount >= order_obj.total:
                 new_status = OrderStatus.CONFIRMED
             
             # Optimistic Locking update
@@ -70,6 +71,7 @@ async def create_transaction(transaction: TransactionCreate, db: AsyncSession = 
         
         await db.commit()
         await db.refresh(db_tx)
+        response.status_code = status.HTTP_201_CREATED
         return db_tx
     
     except IntegrityError:
@@ -78,6 +80,7 @@ async def create_transaction(transaction: TransactionCreate, db: AsyncSession = 
         existing_result = await db.execute(existing_stmt)
         existing_tx = existing_result.scalar_one_or_none()
         if existing_tx:
+            response.status_code = status.HTTP_200_OK
             return existing_tx
         raise HTTPException(status_code=400, detail="Database integrity error")
     except Exception as e:

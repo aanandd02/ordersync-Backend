@@ -1,6 +1,7 @@
 from pydantic import BaseModel, EmailStr, Field
 from typing import List, Optional
 from enum import Enum
+from datetime import datetime
 from .models import OrderStatus, TransactionStatus
 
 class UserBase(BaseModel):
@@ -18,12 +19,13 @@ class UserUpdate(BaseModel):
 class UserOut(UserBase):
     id: int
     is_active: bool
+    created_at: datetime
     class Config:
         from_attributes = True
 
 class OrderBase(BaseModel):
     user_id: int
-    total_amount: float
+    total: float
 
 class OrderCreate(OrderBase):
     pass
@@ -36,6 +38,7 @@ class OrderOut(OrderBase):
     paid_amount: float
     status: OrderStatus
     version: int
+    created_at: datetime
     class Config:
         from_attributes = True
 
@@ -57,6 +60,7 @@ class TransactionCreate(TransactionBase):
 class TransactionOut(TransactionBase):
     id: int
     status: TransactionStatus
+    created_at: datetime
     class Config:
         from_attributes = True
 

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey, Enum, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey, Enum, DateTime, func
 from sqlalchemy.orm import relationship
 from .database import Base
 import enum
@@ -11,6 +11,7 @@ class OrderStatus(str, enum.Enum):
 class TransactionStatus(str, enum.Enum):
     SUCCESS = "success"
     FAILED = "failed"
+    PENDING = "pending"
 
 class User(Base):
     __tablename__ = "users"
@@ -19,6 +20,7 @@ class User(Base):
     name = Column(String, nullable=False)
     email = Column(String, unique=True, index=True, nullable=False)
     is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     orders = relationship("Order", back_populates="user")
 
@@ -27,9 +29,10 @@ class Order(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    total_amount = Column(Float, nullable=False)
+    total = Column(Float, nullable=False)
     paid_amount = Column(Float, default=0.0)
     status = Column(Enum(OrderStatus), default=OrderStatus.PENDING)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
     version = Column(Integer, default=1)
 
     user = relationship("User", back_populates="orders")
@@ -43,5 +46,6 @@ class Transaction(Base):
     amount = Column(Float, nullable=False)
     status = Column(Enum(TransactionStatus), nullable=False)
     idempotency_key = Column(String, unique=True, index=True, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     order = relationship("Order", back_populates="transactions")

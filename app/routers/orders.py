@@ -4,8 +4,8 @@ from sqlalchemy import select, func
 from typing import List
 import math
 from ..database import get_db
-from ..models import Order, User, OrderStatus
-from ..schemas import OrderCreate, OrderOut, PaginatedOrders, OrderUpdate
+from ..models import Order, User, OrderStatus, Transaction
+from ..schemas import OrderCreate, OrderOut, PaginatedOrders, OrderUpdate, TransactionOut
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
 
@@ -33,7 +33,7 @@ async def get_order(order_id: int, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Order not found")
     return db_order
 
-@router.patch("/{order_id}", response_model=OrderOut)
+@router.patch("/{order_id}/status", response_model=OrderOut)
 async def update_order_status(order_id: int, order_update: OrderUpdate, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Order).where(Order.id == order_id))
     db_order = result.scalar_one_or_none()
@@ -50,45 +50,12 @@ async def update_order_status(order_id: int, order_update: OrderUpdate, db: Asyn
     await db.refresh(db_order)
     return db_order
 
-# Separation for user orders as per Rule 5
-@router.get("/user/{user_id}", response_model=PaginatedOrders)
-async def list_user_orders(
-    user_id: int,
-    page: int = Query(1, ge=1),
-    page_size: int = Query(10, ge=1, le=50),
-    db: AsyncSession = Depends(get_db)
-):
-    offset = (page - 1) * page_size
-    
-    # Rule 5: Single round-trip pagination using window functional for count
-    # Note: SQLAlchemy's select(..., func.count().over())
-    stmt = (
-        select(Order, func.count().over().label("total_count"))
-        .where(Order.user_id == user_id)
-        .offset(offset)
-        .limit(page_size)
-    )
-    
-    result = await db.execute(stmt)
-    rows = result.all()
-    
-    if not rows:
-        return {
-            "items": [],
-            "total": 0,
-            "page": page,
-            "page_size": page_size,
-            "pages": 0
-        }
-    
-    total = rows[0].total_count
-    items = [row.Order for row in rows]
-    pages = math.ceil(total / page_size)
-    
-    return {
-        "items": items,
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-        "pages": pages
-    }
+@router.get("/{order_id}/transactions", response_model=List[TransactionOut])
+async def list_order_transactions(order_id: int, db: AsyncSession = Depends(get_db)):
+    # Check if order exists
+    result = await db.execute(select(Order).where(Order.id == order_id))
+    if not result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="Order not found")
+        
+    result = await db.execute(select(Transaction).where(Transaction.order_id == order_id).order_by(Transaction.created_at.desc()))
+    return result.scalars().all()

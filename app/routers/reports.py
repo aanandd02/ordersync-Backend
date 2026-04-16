@@ -10,12 +10,13 @@ router = APIRouter(prefix="/reports", tags=["Reports"])
 async def get_orders_summary(db: AsyncSession = Depends(get_db)):
     # Rule 4: Raw SQL Requirement
     # Aggregated stats in a single query using CTEs
+    # Note: Using text() to execute raw SQL as requested, bypassing ORM query builder
     raw_query = """
     WITH order_stats AS (
         SELECT 
             COUNT(*)::int AS total_orders,
-            COALESCE(SUM(total_amount), 0)::float AS total_revenue,
-            COALESCE(AVG(total_amount), 0)::float AS avg_order_value,
+            COALESCE(SUM(total), 0)::float AS total_revenue,
+            COALESCE(AVG(total), 0)::float AS avg_order_value,
             COUNT(*) FILTER (WHERE status = 'confirmed')::int AS confirmed_orders,
             COUNT(*) FILTER (WHERE status = 'cancelled')::int AS cancelled_orders,
             COUNT(*) FILTER (WHERE status = 'pending')::int AS pending_orders
@@ -64,7 +65,6 @@ async def get_orders_summary(db: AsyncSession = Depends(get_db)):
             "top_users": []
         }
     
-    # row is a tuple, we return it as a dict matching schema
     return {
         "total_orders": row.total_orders,
         "total_revenue": row.total_revenue,
